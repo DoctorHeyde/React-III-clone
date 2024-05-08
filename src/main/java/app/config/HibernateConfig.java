@@ -22,11 +22,13 @@ public class HibernateConfig {
         if (testing) {
             dbName = "testdb";
             return setupHibernateConfigurationForTesting();
-
-        } else {
-            dbName = getDBName();
-            return buildEntityFactoryConfig();
         }
+
+        boolean isDeployed = (System.getenv("DEPLOYED") != null);
+        if (isDeployed) return buildEntityFactoryConfigDeployed();
+
+        dbName = getDBName();
+        return buildEntityFactoryConfig();
     }
 
     private static EntityManagerFactory buildEntityFactoryConfig() {
@@ -67,6 +69,27 @@ public class HibernateConfig {
             props.put("hibernate.archive.autodetection", "class");
             // props.put("hibernate.show_sql", "true");
             props.put("hibernate.hbm2ddl.auto", "create-drop");
+            return getEntityManagerFactory(configuration, props);
+        } catch (Throwable ex) {
+            System.err.println("Initial SessionFactory creation failed." + ex);
+            throw new ExceptionInInitializerError(ex);
+        }
+    }
+
+    private static EntityManagerFactory buildEntityFactoryConfigDeployed() {
+        try {
+            Configuration configuration = new Configuration();
+
+            Properties props = new Properties();
+
+            props.put("hibernate.connection.url", System.getenv("CONNECTION_STR") + System.getenv("DB_NAME"));
+            props.put("hibernate.connection.username", System.getenv("DB_USERNAME"));
+            props.put("hibernate.connection.password", System.getenv("DB_PASSWORD"));
+            props.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"); // dialect for postgresql
+            props.put("hibernate.connection.driver_class", "org.postgresql.Driver"); // driver class for postgresql
+            props.put("hibernate.archive.autodetection", "class"); // hibernate scans for annotated classes
+            props.put("hibernate.current_session_context_class", "thread"); // hibernate current session context
+            props.put("hibernate.hbm2ddl.auto", "update"/*"create-drop"*/); // hibernate creates tables based on entities
             return getEntityManagerFactory(configuration, props);
         } catch (Throwable ex) {
             System.err.println("Initial SessionFactory creation failed." + ex);
